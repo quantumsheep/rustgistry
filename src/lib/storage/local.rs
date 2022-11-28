@@ -96,8 +96,23 @@ impl Storage for LocalStorage {
     async fn create_upload_container(&self, name: String) -> Result<UploadContainer> {
         let uuid = Uuid::new_v4().to_string();
         let path = self.get_upload_file_path(&name, &uuid);
-        fs::create_dir_all(path.parent().unwrap())?;
-        fs::write(path, "")?;
+
+        let parent = path.parent().unwrap();
+        if let Err(e) = fs::create_dir_all(&parent) {
+            return Err(Error::from(format!(
+                "Failed to create upload container directory '{}': {}",
+                parent.display(),
+                e,
+            )));
+        }
+
+        if let Err(e) = fs::write(&path, "") {
+            return Err(Error::from(format!(
+                "Failed to create upload container file '{}': {}",
+                path.display(),
+                e,
+            )));
+        }
 
         let state = UploadState {
             name,
@@ -105,12 +120,16 @@ impl Storage for LocalStorage {
             created_at: SystemTime::now().elapsed().unwrap_or_default().as_secs(),
         };
 
-        let state_json = serde_json::to_string(&state)?;
-
-        Ok(UploadContainer {
-            uuid,
-            state: base64::encode(state_json),
-        })
+        match serde_json::to_string(&state) {
+            Ok(state_json) => Ok(UploadContainer {
+                uuid,
+                state: base64::encode(state_json),
+            }),
+            Err(e) => Err(Error::from(format!(
+                "Failed to serialize upload container state: {}",
+                e
+            ))),
+        }
     }
 
     async fn check_upload_container_validity(&self, name: String, uuid: String) -> bool {
