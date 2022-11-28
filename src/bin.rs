@@ -1,5 +1,7 @@
+use std::env;
 use std::error::Error;
 use std::net::Ipv4Addr;
+use std::sync::Arc;
 
 use clap::Parser;
 use rustgistry::api::v2::ApiV2;
@@ -21,8 +23,24 @@ struct Args {
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let args = Args::parse();
 
-    let storage = LocalStorage::new("/var/lib/rustgistry");
-    let mut api = ApiV2::new(args.host.parse::<Ipv4Addr>()?, args.port, storage);
+    let storage_type = env::var("STORAGE_TYPE").unwrap_or("local".to_string());
+
+    let mut storage = None;
+
+    if storage_type == "local" {
+        let storage_path = env::var("STORAGE_PATH").unwrap_or("/var/lib/rustgistry".to_string());
+        storage = Some(LocalStorage::new(storage_path));
+    }
+
+    if storage.is_none() {
+        panic!("Invalid storage type");
+    }
+
+    let mut api = ApiV2::new(
+        args.host.parse::<Ipv4Addr>()?,
+        args.port,
+        Arc::new(storage.unwrap()),
+    );
     let server = api.listen();
 
     println!("Listening on http://{}:{}", args.host, args.port);

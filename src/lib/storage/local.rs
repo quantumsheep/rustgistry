@@ -4,7 +4,6 @@ use std::{
     io::{BufReader, Read, Write},
     path::PathBuf,
     pin::Pin,
-    sync::Arc,
     time::SystemTime,
 };
 
@@ -27,13 +26,13 @@ pub struct LocalStorage {
 }
 
 impl LocalStorage {
-    pub fn new<S>(path: S) -> Arc<LocalStorage>
+    pub fn new<S>(path: S) -> LocalStorage
     where
         S: AsRef<OsStr>,
     {
-        Arc::new(LocalStorage {
+        LocalStorage {
             path: PathBuf::from(path.as_ref()),
-        })
+        }
     }
 }
 
