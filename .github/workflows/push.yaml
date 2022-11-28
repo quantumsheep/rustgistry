@@ -42,7 +42,7 @@ jobs:
           args: --all -- --check
 
   test-versions:
-    needs: check
+    needs: [linter, format]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -62,7 +62,7 @@ jobs:
           args: --all --all-features --all-targets
 
   test-nightly:
-    needs: check
+    needs: [linter, format]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
@@ -72,7 +72,8 @@ jobs:
           override: true
           profile: minimal
       - uses: Swatinem/rust-cache@v1
-      - name: Run nightly tests
-        working-directory: axum-macros
-        run: |
-          cargo test
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all --all-features --all-targets
+
