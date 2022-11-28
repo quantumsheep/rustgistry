@@ -69,7 +69,11 @@ pub trait Storage: Sync + Send {
 
     async fn close_upload_container(&self, name: String, uuid: String) -> Result<UploadDetails>;
 
-    async fn get_manifest_summary(&self, name: String, reference: String) -> Result<ManifestSummary>;
+    async fn get_manifest_summary(
+        &self,
+        name: String,
+        reference: String,
+    ) -> Result<ManifestSummary>;
 
     async fn get_manifest(&self, name: String, reference: String) -> Result<ManifestDetails>;
 
