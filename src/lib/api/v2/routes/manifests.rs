@@ -12,27 +12,51 @@ use crate::{
         state::SharedState,
     },
     storage::types::manifest::Manifest,
+    utils,
 };
+
+pub async fn get_manifest_info(
+    Path((name, reference)): Path<(String, String)>,
+    Extension(state): Extension<SharedState>,
+) -> impl IntoResponse {
+    match state
+        .storage
+        .get_manifest_summary(name.clone(), reference.clone())
+        .await
+    {
+        Err(e) => {
+            eprintln!("{}", e);
+            RegistryError::new(StatusCode::NOT_FOUND, RegistryErrorCode::ManifestUnknown)
+                .into_response()
+        }
+        Ok(_) => Response::builder()
+            // .header("Docker-Content-Digest", &manifest_summary.digest)
+            // .header("Content-Length", manifest_summary.size.to_string())
+            .body(Body::empty())
+            .unwrap()
+            .into_response(),
+    }
+}
 
 pub async fn get_manifest(
     Path((name, reference)): Path<(String, String)>,
     Extension(state): Extension<SharedState>,
 ) -> impl IntoResponse {
-    let manifest_info_result = state
+    let manifest_details_result = state
         .storage
         .get_manifest(name.clone(), reference.clone())
         .await;
-    if let Err(e) = manifest_info_result {
+    if let Err(e) = manifest_details_result {
         eprintln!("{}", e);
         return RegistryError::new(StatusCode::NOT_FOUND, RegistryErrorCode::ManifestUnknown)
             .into_response();
     }
 
-    let manifest_info = manifest_info_result.unwrap();
-    match serde_json::to_string(&manifest_info.manifest) {
+    let manifest_details = manifest_details_result.unwrap();
+    match utils::to_json_normalized(&manifest_details.manifest) {
         Ok(json) => Response::builder()
-            .header("Docker-Content-Digest", &manifest_info.digest)
-            .header("Content-Type", &manifest_info.manifest.media_type)
+            .header("Docker-Content-Digest", &manifest_details.digest)
+            .header("Content-Type", &manifest_details.manifest.media_type)
             .body(json)
             .unwrap()
             .into_response(),

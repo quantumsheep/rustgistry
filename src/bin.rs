@@ -23,12 +23,13 @@ struct Args {
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let args = Args::parse();
 
-    let storage_type = env::var("STORAGE_TYPE").unwrap_or("local".to_string());
+    let storage_type = env::var("STORAGE_TYPE").unwrap_or_else(|_| "local".to_string());
 
     let mut storage = None;
 
     if storage_type == "local" {
-        let storage_path = env::var("STORAGE_PATH").unwrap_or("/var/lib/rustgistry".to_string());
+        let storage_path =
+            env::var("STORAGE_PATH").unwrap_or_else(|_| "/var/lib/rustgistry".to_string());
         storage = Some(LocalStorage::new(storage_path));
     }
 

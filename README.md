@@ -15,7 +15,7 @@ The goal of this project is to create an implementation that's entirely customiz
 | **Implementation** | **Status** |
 | ------------------ | ---------- |
 | Push               | 🟢         |
-| Pull               | 🔴         |
+| Pull               | 🟠         |
 | Catalog            | 🔴         |
 | Local Storage      | 🟢         |
 | S3 Storage         | 🔴         |

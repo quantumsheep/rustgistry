@@ -27,7 +27,12 @@ pub struct UploadDetails {
     pub digest: String,
 }
 
-pub struct ManifestInfo {
+pub struct ManifestSummary {
+    pub digest: String,
+    pub size: u64,
+}
+
+pub struct ManifestDetails {
     pub manifest: Manifest,
     pub digest: String,
 }
@@ -44,6 +49,12 @@ pub trait Storage: Sync + Send {
         digest: String,
     ) -> Result<Option<ImageLayerInfo>>;
 
+    async fn get_layer(
+        &self,
+        name: String,
+        digest: String,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<Bytes>> + Send>>>;
+
     async fn create_upload_container(&self, name: String) -> Result<UploadContainer>;
 
     async fn check_upload_container_validity(&self, name: String, uuid: String) -> bool;
@@ -58,7 +69,9 @@ pub trait Storage: Sync + Send {
 
     async fn close_upload_container(&self, name: String, uuid: String) -> Result<UploadDetails>;
 
-    async fn get_manifest(&self, name: String, reference: String) -> Result<ManifestInfo>;
+    async fn get_manifest_summary(&self, name: String, reference: String) -> Result<ManifestSummary>;
+
+    async fn get_manifest(&self, name: String, reference: String) -> Result<ManifestDetails>;
 
     async fn update_manifest(
         &self,

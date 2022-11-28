@@ -15,10 +15,12 @@ use sha2::{Digest, Sha256};
 use sync_wrapper::SyncWrapper;
 use uuid::Uuid;
 
+use crate::utils;
+
 use super::{
     base::{ImageLayerInfo, Result, Storage, UploadContainer},
     types::manifest::Manifest,
-    Error, ManifestInfo, UpdateManifestDetails, UploadDetails, UploadStatus,
+    Error, ManifestDetails, ManifestSummary, UpdateManifestDetails, UploadDetails, UploadStatus,
 };
 
 pub struct LocalStorage {
@@ -70,6 +72,32 @@ impl LocalStorage {
 
         path
     }
+
+    fn create_symlink(&self, target: &PathBuf, path: &PathBuf) -> Result<()> {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::symlink;
+            if let Err(e) = symlink(target, path) {
+                return Err(Box::new(e));
+            }
+        }
+
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::symlink_file;
+            if let Err(e) = symlink_file(target, path) {
+                return Err(Box::new(e));
+            }
+        }
+
+        Ok(())
+    }
+
+    fn is_sha256_digest(&self, digest: &String) -> bool {
+        digest.starts_with("sha256:")
+            && digest.len() == 64
+            && digest.chars().all(|c| c.is_ascii_hexdigit())
+    }
 }
 
 #[async_trait]
@@ -92,12 +120,34 @@ impl Storage for LocalStorage {
         }))
     }
 
+    async fn get_layer(
+        &self,
+        name: String,
+        digest: String,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<Bytes>> + Send>>> {
+        let path = self.get_layer_file_path(&name, &digest);
+
+        if !path.is_file() {
+            return Err(Error::from("layer not found"));
+        }
+
+        let file = File::open(&path)?;
+        let reader = BufReader::new(file);
+
+        let stream = futures::stream::iter(reader.bytes().map(|b| {
+            b.map(|b| Bytes::from(vec![b]))
+                .map_err(|e| Box::new(e) as Error)
+        }));
+
+        Ok(Box::pin(stream))
+    }
+
     async fn create_upload_container(&self, name: String) -> Result<UploadContainer> {
         let uuid = Uuid::new_v4().to_string();
         let path = self.get_upload_file_path(&name, &uuid);
 
         let parent = path.parent().unwrap();
-        if let Err(e) = fs::create_dir_all(&parent) {
+        if let Err(e) = fs::create_dir_all(parent) {
             return Err(Error::from(format!(
                 "Failed to create upload container directory '{}': {}",
                 parent.display(),
@@ -193,14 +243,43 @@ impl Storage for LocalStorage {
         Ok(UploadDetails { digest })
     }
 
-    async fn get_manifest(&self, name: String, reference: String) -> Result<ManifestInfo> {
-        let path = self.get_manifest_file_path(&name, &reference);
+    async fn get_manifest_summary(
+        &self,
+        name: String,
+        reference: String,
+    ) -> Result<ManifestSummary> {
+        let mut path = self.get_manifest_file_path(&name, &reference);
+        if path.is_symlink() && self.is_sha256_digest(&reference) {
+            path = path.read_link()?;
+        }
 
         if !path.is_file() {
             return Err(Error::from("Manifest not found"));
         }
 
-        let manifest_content = fs::read_to_string(path)?;
+        let manifest_content = fs::read_to_string(&path)?;
+
+        let mut hasher = Sha256::new();
+        hasher.update(&manifest_content);
+        let hash = hex::encode(hasher.finalize());
+        let digest = format!("sha256:{}", hash);
+
+        let size = path.metadata()?.len();
+
+        Ok(ManifestSummary { digest, size })
+    }
+
+    async fn get_manifest(&self, name: String, reference: String) -> Result<ManifestDetails> {
+        let mut path = self.get_manifest_file_path(&name, &reference);
+        if path.is_symlink() && self.is_sha256_digest(&reference) {
+            path = path.read_link()?;
+        }
+
+        if !path.is_file() {
+            return Err(Error::from("Manifest not found"));
+        }
+
+        let manifest_content = fs::read_to_string(&path)?;
         let manifest: Manifest = serde_json::from_str(&manifest_content)?;
 
         let mut hasher = Sha256::new();
@@ -208,7 +287,7 @@ impl Storage for LocalStorage {
         let hash = hex::encode(hasher.finalize());
         let digest = format!("sha256:{}", hash);
 
-        Ok(ManifestInfo { manifest, digest })
+        Ok(ManifestDetails { manifest, digest })
     }
 
     async fn update_manifest(
@@ -217,19 +296,28 @@ impl Storage for LocalStorage {
         reference: String,
         manifest: Manifest,
     ) -> Result<UpdateManifestDetails> {
-        let path = self.get_manifest_file_path(&name, &reference);
+        let json = utils::to_json_normalized(&manifest)?;
 
-        fs::create_dir_all(path.parent().unwrap())?;
-        let mut file = File::create(path)?;
+        let mut path = self.get_manifest_file_path(&name, &reference);
+        if path.is_symlink() && self.is_sha256_digest(&reference) {
+            path = path.read_link()?;
+        }
 
-        let json = serde_json::to_string(&manifest)?;
-        file.write_all(json.as_bytes())?;
+        let parent = path.parent().unwrap();
+        fs::create_dir_all(parent)?;
+        fs::write(&path, &json)?;
 
         let mut hasher = Sha256::new();
         hasher.update(json.as_bytes());
-
         let hash = hex::encode(hasher.finalize());
         let digest = format!("sha256:{}", hash);
+
+        let symlink_path = parent.join(&digest);
+        if symlink_path.exists() {
+            fs::remove_file(&symlink_path)?;
+        }
+
+        self.create_symlink(&path, &symlink_path)?;
 
         Ok(UpdateManifestDetails { digest })
     }

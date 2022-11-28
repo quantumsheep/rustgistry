@@ -8,11 +8,23 @@ pub struct Manifest {
     #[serde(rename = "mediaType")]
     pub media_type: String,
 
+    pub config: ManifestConfig,
+
     #[serde(default)]
     pub manifests: Option<Vec<ManifestEntry>>,
 
     #[serde(default)]
     pub layers: Option<Vec<LayerEntry>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ManifestConfig {
+    #[serde(rename = "mediaType")]
+    pub media_type: String,
+
+    pub size: u64,
+
+    pub digest: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

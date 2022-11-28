@@ -6,7 +6,7 @@ use axum::{
 };
 use futures::StreamExt;
 use hyper::{Body, HeaderMap, StatusCode};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use sync_wrapper::SyncWrapper;
 
 use crate::api::v2::errors::{RegistryError, RegistryErrorCode};
@@ -144,7 +144,7 @@ pub async fn receive_upload_monolithic(
                 .into_response()
         }
         Err(e) => {
-            eprintln!("ERROR: {}", e);
+            eprintln!("{}", e);
             StatusCode::INTERNAL_SERVER_ERROR.into_response()
         }
     }
@@ -197,9 +197,6 @@ pub async fn receive_upload_chunked(
     response.into_response()
 }
 
-#[derive(Serialize)]
-struct DigestExistsResponse {}
-
 pub async fn exists(
     Path((name, digest)): Path<(String, String)>,
     Extension(state): Extension<SharedState>,
@@ -227,4 +224,27 @@ pub async fn exists(
             .into_response(),
         None => StatusCode::NOT_FOUND.into_response(),
     }
+}
+
+pub async fn get_layer(
+    Path((name, digest)): Path<(String, String)>,
+    Extension(state): Extension<SharedState>,
+) -> impl IntoResponse {
+    let layer_result = state.storage.get_layer(name, digest.clone()).await;
+    if let Err(e) = layer_result {
+        eprintln!("{}", e);
+        return StatusCode::NOT_FOUND.into_response();
+    }
+
+    let layer_stream = layer_result.unwrap();
+
+    Response::builder()
+        .header("Accept-Ranges", "bytes")
+        .header("Content-Length", "0")
+        .header("Docker-Content-Digest", &digest)
+        .header("Etag", format!("\"{}\"", digest))
+        .header("Content-Type", "application/octet-stream")
+        .body(Body::wrap_stream(layer_stream))
+        .unwrap()
+        .into_response()
 }

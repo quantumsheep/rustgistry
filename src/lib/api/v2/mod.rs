@@ -48,6 +48,10 @@ impl ApiV2 {
             .route("/v2", get(routes::version::get_version))
             .route(
                 "/v2/:name/manifests/:reference",
+                head(routes::manifests::get_manifest_info),
+            )
+            .route(
+                "/v2/:name/manifests/:reference",
                 get(routes::manifests::get_manifest),
             )
             .route(
@@ -67,6 +71,7 @@ impl ApiV2 {
                 patch(routes::blobs::receive_upload_chunked),
             )
             .route("/v2/:name/blobs/:digest", head(routes::blobs::exists))
+            .route("/v2/:name/blobs/:digest", get(routes::blobs::get_layer))
             .layer(Extension(app_state))
             .layer(
                 ServiceBuilder::new()
