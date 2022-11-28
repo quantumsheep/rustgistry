@@ -81,7 +81,7 @@ impl Storage for LocalStorage {
     ) -> Result<Option<ImageLayerInfo>> {
         let path = self.get_layer_file_path(&name, &digest);
 
-        if !path.exists() || !path.is_file() {
+        if !path.is_file() {
             return Ok(None);
         }
 
@@ -196,7 +196,7 @@ impl Storage for LocalStorage {
     async fn get_manifest(&self, name: String, reference: String) -> Result<ManifestInfo> {
         let path = self.get_manifest_file_path(&name, &reference);
 
-        if !path.exists() || !path.is_file() {
+        if !path.is_file() {
             return Err(Error::from("Manifest not found"));
         }
 
@@ -237,7 +237,7 @@ impl Storage for LocalStorage {
     async fn delete_manifest(&self, name: String, reference: String) -> Result<()> {
         let path = self.get_manifest_file_path(&name, &reference);
 
-        if !path.exists() || !path.is_file() {
+        if !path.is_file() {
             return Err(Error::from("Manifest not found"));
         }
 
