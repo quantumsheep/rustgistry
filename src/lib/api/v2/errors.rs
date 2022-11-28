@@ -131,7 +131,7 @@ pub struct RegistryError {
 
 impl RegistryError {
     pub fn new(status: StatusCode, code: RegistryErrorCode) -> RegistryError {
-        return RegistryError { status, code };
+        RegistryError { status, code }
     }
 }
 

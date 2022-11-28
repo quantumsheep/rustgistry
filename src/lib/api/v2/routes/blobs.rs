@@ -126,7 +126,7 @@ pub async fn receive_upload_monolithic(
                 }
             }
 
-            return Response::builder()
+            Response::builder()
                 .status(StatusCode::CREATED)
                 .header("Docker-Content-Digest", &details.digest)
                 .header(
@@ -141,7 +141,7 @@ pub async fn receive_upload_monolithic(
                 )
                 .body(Body::empty())
                 .unwrap()
-                .into_response();
+                .into_response()
         }
         Err(e) => {
             eprintln!("ERROR: {}", e);
@@ -194,7 +194,7 @@ pub async fn receive_upload_chunked(
         .body(Body::empty())
         .unwrap();
 
-    return response.into_response();
+    response.into_response()
 }
 
 #[derive(Serialize)]

@@ -38,11 +38,11 @@ pub async fn get_manifest(
             .into_response(),
         Err(e) => {
             eprintln!("{}", e);
-            return RegistryError::new(
+            RegistryError::new(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 RegistryErrorCode::ManifestInvalid,
             )
-            .into_response();
+            .into_response()
         }
     }
 }

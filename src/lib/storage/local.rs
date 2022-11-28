@@ -48,8 +48,8 @@ impl LocalStorage {
     fn get_upload_file_path(&self, name: &String, uuid: &String) -> PathBuf {
         let mut path = self.path.clone();
         path.push("uploads");
-        path.push(format!("{}", name));
-        path.push(format!("{}", uuid));
+        path.push(name);
+        path.push(uuid);
 
         path
     }
@@ -57,8 +57,8 @@ impl LocalStorage {
     fn get_layer_file_path(&self, name: &String, digest: &String) -> PathBuf {
         let mut path = self.path.clone();
         path.push("layers");
-        path.push(format!("{}", name));
-        path.push(format!("{}", digest));
+        path.push(name);
+        path.push(digest);
 
         path
     }
@@ -66,8 +66,8 @@ impl LocalStorage {
     fn get_manifest_file_path(&self, name: &String, reference: &String) -> PathBuf {
         let mut path = self.path.clone();
         path.push("manifests");
-        path.push(format!("{}", name));
-        path.push(format!("{}", reference));
+        path.push(name);
+        path.push(reference);
 
         path
     }
@@ -179,7 +179,7 @@ impl Storage for LocalStorage {
         let path = self.get_manifest_file_path(&name, &reference);
 
         if !path.exists() || !path.is_file() {
-            return Err(Error::from(format!("Manifest not found")));
+            return Err(Error::from("Manifest not found"));
         }
 
         let manifest_content = fs::read_to_string(path)?;
@@ -220,7 +220,7 @@ impl Storage for LocalStorage {
         let path = self.get_manifest_file_path(&name, &reference);
 
         if !path.exists() || !path.is_file() {
-            return Err(Error::from(format!("Manifest not found")));
+            return Err(Error::from("Manifest not found"));
         }
 
         fs::remove_file(path)?;
