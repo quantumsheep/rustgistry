@@ -181,9 +181,9 @@ impl Storage for LocalStorage {
         }
     }
 
-    async fn check_upload_container_validity(&self, name: String, uuid: String) -> bool {
+    async fn check_upload_container_validity(&self, name: String, uuid: String) -> Result<bool> {
         let path = self.get_upload_file_path(&name, &uuid);
-        path.exists() && path.is_file()
+        Ok(path.exists() && path.is_file())
     }
 
     async fn write_upload_container(

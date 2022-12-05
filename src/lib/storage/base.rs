@@ -57,7 +57,7 @@ pub trait Storage: Sync + Send {
 
     async fn create_upload_container(&self, name: String) -> Result<UploadContainer>;
 
-    async fn check_upload_container_validity(&self, name: String, uuid: String) -> bool;
+    async fn check_upload_container_validity(&self, name: String, uuid: String) -> Result<bool>;
 
     async fn write_upload_container(
         &self,

@@ -40,7 +40,7 @@ impl ApiV2 {
     }
 
     pub async fn listen(&mut self) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let app_state = SharedState::new(self.storage.clone());
+        let app_state = SharedState::new(Arc::clone(&self.storage));
 
         tracing_subscriber::fmt::init();
 

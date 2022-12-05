@@ -62,13 +62,21 @@ pub async fn receive_upload_monolithic(
     Extension(state): Extension<SharedState>,
     mut body: BodyStream,
 ) -> impl IntoResponse {
-    if !state
+    let validity_result = state
         .storage
         .check_upload_container_validity(name.clone(), uuid.clone())
-        .await
-    {
-        return RegistryError::new(StatusCode::NOT_FOUND, RegistryErrorCode::BlobUploadInvalid)
-            .into_response();
+        .await;
+
+    match validity_result {
+        Ok(false) => {
+            return RegistryError::new(StatusCode::NOT_FOUND, RegistryErrorCode::BlobUploadInvalid)
+                .into_response()
+        }
+        Err(e) => {
+            eprintln!("{}", e);
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+        _ => {}
     }
 
     let content_length = match headers.get("Content-Length") {
@@ -161,13 +169,21 @@ pub async fn receive_upload_chunked(
     Extension(state): Extension<SharedState>,
     mut body: BodyStream,
 ) -> impl IntoResponse {
-    if !state
+    let validity_result = state
         .storage
         .check_upload_container_validity(name.clone(), uuid.clone())
-        .await
-    {
-        return RegistryError::new(StatusCode::NOT_FOUND, RegistryErrorCode::BlobUploadInvalid)
-            .into_response();
+        .await;
+
+    match validity_result {
+        Ok(false) => {
+            return RegistryError::new(StatusCode::NOT_FOUND, RegistryErrorCode::BlobUploadInvalid)
+                .into_response()
+        }
+        Err(e) => {
+            eprintln!("{}", e);
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+        _ => {}
     }
 
     let buffer =
