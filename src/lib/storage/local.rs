@@ -47,30 +47,15 @@ struct UploadState {
 
 impl LocalStorage {
     fn get_upload_file_path(&self, name: &String, uuid: &String) -> PathBuf {
-        let mut path = self.path.clone();
-        path.push("uploads");
-        path.push(name);
-        path.push(uuid);
-
-        path
+        ["uploads", name, uuid].iter().collect()
     }
 
     fn get_layer_file_path(&self, name: &String, digest: &String) -> PathBuf {
-        let mut path = self.path.clone();
-        path.push("layers");
-        path.push(name);
-        path.push(digest);
-
-        path
+        ["layers", name, digest].iter().collect()
     }
 
     fn get_manifest_file_path(&self, name: &String, reference: &String) -> PathBuf {
-        let mut path = self.path.clone();
-        path.push("manifests");
-        path.push(name);
-        path.push(reference);
-
-        path
+        ["manifests", name, reference].iter().collect()
     }
 
     fn create_symlink(&self, target: &PathBuf, path: &PathBuf) -> Result<()> {
