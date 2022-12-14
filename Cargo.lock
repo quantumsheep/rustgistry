@@ -1250,6 +1250,7 @@ dependencies = [
  "hex",
  "hyper",
  "lazy_static",
+ "rand",
  "rusoto_core",
  "rusoto_s3",
  "rusoto_sqs",

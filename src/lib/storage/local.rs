@@ -19,6 +19,7 @@ use crate::utils;
 
 use super::{
     base::{ImageLayerInfo, Result, Storage, UploadContainer},
+    is_sha256_digest,
     types::manifest::Manifest,
     Error, ManifestDetails, ManifestSummary, UpdateManifestDetails, UploadDetails, UploadStatus,
 };
@@ -47,15 +48,30 @@ struct UploadState {
 
 impl LocalStorage {
     fn get_upload_file_path(&self, name: &String, uuid: &String) -> PathBuf {
-        ["uploads", name, uuid].iter().collect()
+        let mut path = self.path.clone();
+        path.push("uploads");
+        path.push(name);
+        path.push(uuid);
+
+        path
     }
 
     fn get_layer_file_path(&self, name: &String, digest: &String) -> PathBuf {
-        ["layers", name, digest].iter().collect()
+        let mut path = self.path.clone();
+        path.push("layers");
+        path.push(name);
+        path.push(digest);
+
+        path
     }
 
     fn get_manifest_file_path(&self, name: &String, reference: &String) -> PathBuf {
-        ["manifests", name, reference].iter().collect()
+        let mut path = self.path.clone();
+        path.push("manifests");
+        path.push(name);
+        path.push(reference);
+
+        path
     }
 
     fn create_symlink(&self, target: &PathBuf, path: &PathBuf) -> Result<()> {
@@ -76,12 +92,6 @@ impl LocalStorage {
         }
 
         Ok(())
-    }
-
-    fn is_sha256_digest(&self, digest: &String) -> bool {
-        digest.starts_with("sha256:")
-            && digest.len() == 64
-            && digest.chars().all(|c| c.is_ascii_hexdigit())
     }
 }
 
@@ -234,7 +244,7 @@ impl Storage for LocalStorage {
         reference: String,
     ) -> Result<ManifestSummary> {
         let mut path = self.get_manifest_file_path(&name, &reference);
-        if path.is_symlink() && self.is_sha256_digest(&reference) {
+        if path.is_symlink() && is_sha256_digest(&reference) {
             path = path.read_link()?;
         }
 
@@ -256,7 +266,7 @@ impl Storage for LocalStorage {
 
     async fn get_manifest(&self, name: String, reference: String) -> Result<ManifestDetails> {
         let mut path = self.get_manifest_file_path(&name, &reference);
-        if path.is_symlink() && self.is_sha256_digest(&reference) {
+        if path.is_symlink() && is_sha256_digest(&reference) {
             path = path.read_link()?;
         }
 
@@ -284,7 +294,7 @@ impl Storage for LocalStorage {
         let json = utils::to_json_normalized(&manifest)?;
 
         let mut path = self.get_manifest_file_path(&name, &reference);
-        if path.is_symlink() && self.is_sha256_digest(&reference) {
+        if path.is_symlink() && is_sha256_digest(&reference) {
             path = path.read_link()?;
         }
 
@@ -318,4 +328,17 @@ impl Storage for LocalStorage {
 
         Ok(())
     }
+}
+
+#[tokio::test]
+async fn test_upload_layer() -> Result<()> {
+    use std::sync::Arc;
+
+    let temp_dir = tempfile::tempdir()?;
+    let temp_dir_path = temp_dir.path();
+    let storage = Arc::new(LocalStorage::new(temp_dir_path));
+
+    let result = super::tests::test_upload_layer(storage).await;
+
+    result
 }
