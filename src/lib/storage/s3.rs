@@ -357,7 +357,7 @@ impl Storage for S3Storage {
         let json = utils::to_json_normalized(&manifest)?;
 
         let mut hasher = Sha256::new();
-        hasher.update(&json.as_bytes());
+        hasher.update(json.as_bytes());
         let hash = hex::encode(hasher.finalize());
         let digest = format!("sha256:{}", hash);
 

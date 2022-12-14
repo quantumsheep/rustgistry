@@ -123,13 +123,11 @@ impl Storage for LocalStorage {
             return Err(Error::from("layer not found"));
         }
 
-        let stream = File::open(&path).await.and_then(|file| {
-            Ok(
-                FramedRead::new(file, BytesCodec::new()).map(|bytes| match bytes {
-                    Ok(bytes) => Ok(bytes.freeze()),
-                    Err(e) => Err(Error::from(format!("Failed to read layer file: {}", e))),
-                }),
-            )
+        let stream = File::open(&path).await.map(|file| {
+            FramedRead::new(file, BytesCodec::new()).map(|bytes| match bytes {
+                Ok(bytes) => Ok(bytes.freeze()),
+                Err(e) => Err(Error::from(format!("Failed to read layer file: {}", e))),
+            })
         })?;
 
         Ok(Box::pin(stream))
@@ -206,7 +204,7 @@ impl Storage for LocalStorage {
 
         File::open(&path)
             .await
-            .and_then(|file| Ok(FramedRead::new(file, BytesCodec::new())))?
+            .map(|file| FramedRead::new(file, BytesCodec::new()))?
             .for_each(|bytes| {
                 if let Ok(values) = bytes {
                     hasher.update(&values);

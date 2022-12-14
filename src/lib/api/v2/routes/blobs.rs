@@ -255,7 +255,7 @@ pub async fn get_layer(
     }
 
     let layer_info_option = layer_info_result.unwrap();
-    if let None = layer_info_option {
+    if layer_info_option.is_none() {
         return StatusCode::NOT_FOUND.into_response();
     }
 
