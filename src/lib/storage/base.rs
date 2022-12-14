@@ -105,7 +105,7 @@ pub mod tests {
     use std::sync::Arc;
 
     use bytes::Bytes;
-    use futures::StreamExt;
+    use futures::{StreamExt, TryStreamExt};
     use rand::Rng;
     use sync_wrapper::SyncWrapper;
 
@@ -125,8 +125,11 @@ pub mod tests {
 
         let chunk_size = rand::thread_rng().gen_range(100..=1024);
         let chunk_count = rand::thread_rng().gen_range(5..=10);
+        let chunks = (0..chunk_count)
+            .map(|_| rand_bytes(chunk_size))
+            .collect::<Vec<_>>();
 
-        let stream = futures::stream::iter(0..chunk_count).map(move |_| Ok(rand_bytes(chunk_size)));
+        let stream = futures::stream::iter(chunks.clone()).map(Ok);
 
         let upload_status = storage
             .write_upload_container(
@@ -144,6 +147,20 @@ pub mod tests {
             .await?;
 
         assert!(is_sha256_digest(&upload_details.digest));
+
+        let layer = storage
+            .get_layer(name.clone(), upload_details.digest.clone())
+            .await?;
+
+        let original_layer = chunks.concat();
+        let downloaded_layer = layer
+            .into_stream()
+            .map_ok(|bytes| bytes.to_vec())
+            .try_collect::<Vec<_>>()
+            .await?
+            .concat();
+
+        assert_eq!(original_layer, downloaded_layer);
 
         Ok(())
     }
