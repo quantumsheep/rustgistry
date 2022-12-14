@@ -130,12 +130,7 @@ pub mod tests {
         let stream = futures::stream::iter(chunks.clone()).map(Ok);
 
         let upload_status = storage
-            .write_upload_container(
-                name.clone(),
-                uuid.clone(),
-                Box::pin(stream),
-                (0, 0),
-            )
+            .write_upload_container(name.clone(), uuid.clone(), Box::pin(stream), (0, 0))
             .await?;
 
         assert_eq!(upload_status.size, (chunk_size * chunk_count) as u64);
