@@ -338,7 +338,5 @@ async fn test_upload_layer() -> Result<()> {
     let temp_dir_path = temp_dir.path();
     let storage = Arc::new(LocalStorage::new(temp_dir_path));
 
-    let result = super::tests::test_upload_layer(storage).await;
-
-    result
+    super::tests::test_upload_layer(storage).await
 }
