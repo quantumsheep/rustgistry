@@ -7,7 +7,6 @@ use axum::{
 use futures::StreamExt;
 use hyper::{Body, HeaderMap, StatusCode};
 use serde::Deserialize;
-use sync_wrapper::SyncWrapper;
 
 use crate::api::v2::errors::{RegistryError, RegistryErrorCode};
 use crate::{api::v2::state::SharedState, storage::Error};
@@ -108,7 +107,7 @@ pub async fn receive_upload_monolithic(
             .write_upload_container(
                 name.clone(),
                 uuid.clone(),
-                SyncWrapper::new(Box::pin(buffer)),
+                Box::pin(buffer),
                 (0, content_length as u64),
             )
             .await
@@ -194,7 +193,7 @@ pub async fn receive_upload_chunked(
 
     let status_result = state
         .storage
-        .write_upload_container(name, uuid, SyncWrapper::new(Box::pin(buffer)), (1, 2))
+        .write_upload_container(name, uuid, Box::pin(buffer), (1, 2))
         .await;
 
     if let Err(e) = status_result {
@@ -246,6 +245,22 @@ pub async fn get_layer(
     Path((name, digest)): Path<(String, String)>,
     Extension(state): Extension<SharedState>,
 ) -> impl IntoResponse {
+    let layer_info_result = state
+        .storage
+        .get_image_layer_info(name.clone(), digest.clone())
+        .await;
+    if let Err(e) = layer_info_result {
+        eprintln!("{}", e);
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    }
+
+    let layer_info_option = layer_info_result.unwrap();
+    if let None = layer_info_option {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+
+    let layer_info = layer_info_option.unwrap();
+
     let layer_result = state.storage.get_layer(name, digest.clone()).await;
     if let Err(e) = layer_result {
         eprintln!("{}", e);
@@ -256,7 +271,7 @@ pub async fn get_layer(
 
     Response::builder()
         .header("Accept-Ranges", "bytes")
-        .header("Content-Length", "0")
+        .header("Content-Length", layer_info.size)
         .header("Docker-Content-Digest", &digest)
         .header("Etag", format!("\"{}\"", digest))
         .header("Content-Type", "application/octet-stream")

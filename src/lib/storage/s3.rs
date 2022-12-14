@@ -10,9 +10,6 @@ use rusoto_s3::{
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use sync_wrapper::SyncWrapper;
-use tokio::io::AsyncWriteExt;
-use tokio_util::codec;
 use uuid::Uuid;
 
 use crate::utils;
@@ -202,26 +199,17 @@ impl Storage for S3Storage {
         &self,
         name: String,
         uuid: String,
-        mut stream: SyncWrapper<Pin<Box<dyn Stream<Item = Result<Bytes>> + Send>>>,
+        stream: Pin<Box<dyn Stream<Item = Result<Bytes>> + Send>>,
         _range: (u64, u64),
     ) -> Result<UploadStatus> {
         let key = self.get_upload_file_path(&name, &uuid);
 
         let tmp_file = tempfile::NamedTempFile::new()?;
 
-        let inner = stream.get_mut();
-        let mut writer = tokio::fs::File::from_std(tmp_file.reopen()?);
-        while let Some(bytes) = inner.next().await {
-            let bytes = bytes?;
-            writer.write_all(&bytes).await?;
-        }
-
-        let tokio_file = tokio::fs::File::from_std(tmp_file.reopen()?);
-        let byte_stream =
-            codec::FramedRead::new(tokio_file, codec::BytesCodec::new()).map(|r| match r {
-                Ok(b) => Ok(b.freeze()),
-                Err(e) => Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
-            });
+        let byte_stream = stream.map(move |b| match b {
+            Ok(b) => Ok(b),
+            Err(e) => Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
+        });
 
         self.client
             .put_object(PutObjectRequest {

@@ -1,18 +1,15 @@
-use std::{
-    ffi::OsStr,
-    fs::{self, File, OpenOptions},
-    io::{BufReader, Read, Write},
-    path::PathBuf,
-    pin::Pin,
-    time::SystemTime,
-};
+use std::{ffi::OsStr, fs, path::PathBuf, pin::Pin, time::SystemTime};
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use sync_wrapper::SyncWrapper;
+use tokio::{
+    fs::{File, OpenOptions},
+    io::AsyncWriteExt,
+};
+use tokio_util::codec::{BytesCodec, FramedRead};
 use uuid::Uuid;
 
 use crate::utils;
@@ -126,13 +123,14 @@ impl Storage for LocalStorage {
             return Err(Error::from("layer not found"));
         }
 
-        let file = File::open(&path)?;
-        let reader = BufReader::new(file);
-
-        let stream = futures::stream::iter(reader.bytes().map(|b| {
-            b.map(|b| Bytes::from(vec![b]))
-                .map_err(|e| Box::new(e) as Error)
-        }));
+        let stream = File::open(&path).await.and_then(|file| {
+            Ok(
+                FramedRead::new(file, BytesCodec::new()).map(|bytes| match bytes {
+                    Ok(bytes) => Ok(bytes.freeze()),
+                    Err(e) => Err(Error::from(format!("Failed to read layer file: {}", e))),
+                }),
+            )
+        })?;
 
         Ok(Box::pin(stream))
     }
@@ -185,26 +183,17 @@ impl Storage for LocalStorage {
         &self,
         name: String,
         uuid: String,
-        mut stream: SyncWrapper<Pin<Box<dyn Stream<Item = Result<Bytes>> + Send>>>,
+        mut stream: Pin<Box<dyn Stream<Item = Result<Bytes>> + Send>>,
         _range: (u64, u64),
     ) -> Result<UploadStatus> {
         let path = self.get_upload_file_path(&name, &uuid);
-        let mut file = OpenOptions::new().append(true).open(path)?;
+        let mut file = OpenOptions::new().append(true).open(path).await?;
 
-        let inner = stream.get_mut();
-
-        while let Some(bytes) = inner.next().await {
-            match bytes {
-                Ok(bytes) => {
-                    file.write_all(&bytes)?;
-                }
-                Err(e) => {
-                    return Err(Error::from(e.to_string()));
-                }
-            }
+        while let Some(bytes) = stream.next().await {
+            file.write_all(&bytes?).await?;
         }
 
-        let metadata = file.metadata()?;
+        let metadata = file.metadata().await?;
         Ok(UploadStatus {
             size: metadata.len(),
         })
@@ -212,20 +201,20 @@ impl Storage for LocalStorage {
 
     async fn close_upload_container(&self, name: String, uuid: String) -> Result<UploadDetails> {
         let path = self.get_upload_file_path(&name, &uuid);
-        let file = File::open(&path)?;
-        let mut reader = BufReader::new(file);
 
         let mut hasher = Sha256::new();
-        let mut buffer = [0; 1024];
 
-        loop {
-            let n = reader.read(&mut buffer)?;
-            if n == 0 {
-                break;
-            }
+        File::open(&path)
+            .await
+            .and_then(|file| Ok(FramedRead::new(file, BytesCodec::new())))?
+            .for_each(|bytes| {
+                if let Ok(values) = bytes {
+                    hasher.update(&values);
+                }
 
-            hasher.update(&buffer[..n]);
-        }
+                std::future::ready(())
+            })
+            .await;
 
         let hash = hex::encode(hasher.finalize());
         let digest = format!("sha256:{}", hash);

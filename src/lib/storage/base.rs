@@ -3,7 +3,6 @@ use std::pin::Pin;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::Stream;
-use sync_wrapper::SyncWrapper;
 
 use super::types::manifest::Manifest;
 
@@ -70,7 +69,7 @@ pub trait Storage: Sync + Send {
         &self,
         name: String,
         uuid: String,
-        mut stream: SyncWrapper<Pin<Box<dyn Stream<Item = Result<Bytes>> + Send>>>,
+        mut stream: Pin<Box<dyn Stream<Item = Result<Bytes>> + Send>>,
         range: (u64, u64),
     ) -> Result<UploadStatus>;
 
@@ -107,7 +106,6 @@ pub mod tests {
     use bytes::Bytes;
     use futures::{StreamExt, TryStreamExt};
     use rand::Rng;
-    use sync_wrapper::SyncWrapper;
 
     use super::{is_sha256_digest, Result, Storage};
 
@@ -135,7 +133,7 @@ pub mod tests {
             .write_upload_container(
                 name.clone(),
                 uuid.clone(),
-                SyncWrapper::new(Box::pin(stream)),
+                Box::pin(stream),
                 (0, 0),
             )
             .await?;
