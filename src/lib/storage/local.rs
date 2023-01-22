@@ -191,6 +191,8 @@ impl Storage for LocalStorage {
             file.write_all(&bytes?).await?;
         }
 
+        file.flush().await?;
+
         let metadata = file.metadata().await?;
         Ok(UploadStatus {
             size: metadata.len(),
